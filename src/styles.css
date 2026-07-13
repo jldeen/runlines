@@ -271,22 +271,50 @@ details summary {
   border: 1px solid var(--border);
   border-left: 3px solid var(--warn);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 0;
   flex: 0 0 auto;
+  overflow: hidden;
+}
+.cue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 10px 14px;
+  min-height: 44px;
+  font-family: inherit;
+  text-align: left;
+}
+.cue.open .cue-head {
+  padding-bottom: 4px;
 }
 .cue h3 {
-  margin: 0 0 5px;
+  margin: 0;
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--warn);
 }
-.cue p {
+.cue-toggle {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cue-body {
+  padding: 0 14px 12px;
+}
+.cue-body p {
   margin: 0;
   font-size: 14px;
   color: var(--text);
 }
-.cue .none {
+.cue-body .none {
   color: var(--muted);
   font-style: italic;
 }
@@ -909,7 +937,7 @@ input[type='range'] {
   .card .lines {
     font-size: 18px;
   }
-  .cue p {
+  .cue-body p {
     font-size: 13px;
   }
   .toolbtns .iconbtn {

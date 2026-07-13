@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { Beat } from '../types';
+import { getCueExpanded, saveCueExpanded } from '../lib/storage';
 
 export function Cue({ beat, len, idx }: { beat: Beat; len: number; idx: number }) {
   return (
@@ -24,13 +26,38 @@ export function Cue({ beat, len, idx }: { beat: Beat; len: number; idx: number }
 }
 
 export function StageCue({ beat }: { beat: Beat }) {
+  const [expanded, setExpanded] = useState<boolean>(() => getCueExpanded());
+
+  const toggle = () => {
+    setExpanded((e) => {
+      const next = !e;
+      saveCueExpanded(next);
+      return next;
+    });
+  };
+
   return (
-    <div className="cue">
-      <h3>Stage cue</h3>
-      {beat.cue ? (
-        <p>{beat.cue}</p>
-      ) : (
-        <p className="none">No stage direction for this beat — go by memory.</p>
+    <div className={'cue' + (expanded ? ' open' : ' collapsed')}>
+      <button
+        type="button"
+        className="cue-head"
+        aria-expanded={expanded}
+        aria-controls="cueBody"
+        onClick={toggle}
+      >
+        <h3>Stage cue</h3>
+        <span className="cue-toggle" aria-hidden="true">
+          {expanded ? '▾ Hide' : '▸ Show'}
+        </span>
+      </button>
+      {expanded && (
+        <div id="cueBody" className="cue-body">
+          {beat.cue ? (
+            <p>{beat.cue}</p>
+          ) : (
+            <p className="none">No stage direction for this beat — go by memory.</p>
+          )}
+        </div>
       )}
     </div>
   );

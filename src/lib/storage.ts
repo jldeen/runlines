@@ -6,6 +6,7 @@ export const KEYS = {
   scores: 'runlines.scores',
   view: 'runlines.view',
   tp: 'runlines.tp',
+  cue: 'runlines.cue',
 } as const;
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -109,4 +110,13 @@ export function getTpPrefs(): TpPrefs {
 
 export function saveTpPrefs(p: TpPrefs): void {
   writeJSON(KEYS.tp, p);
+}
+
+/* ---------- Stage-cue collapse (collapsed by default) ---------- */
+export function getCueExpanded(): boolean {
+  return readJSON<boolean>(KEYS.cue, false) === true;
+}
+
+export function saveCueExpanded(v: boolean): void {
+  writeJSON(KEYS.cue, v);
 }
