@@ -12,8 +12,10 @@ stage cues, tap-to-reveal, and a progressive word-fade slider.
 - **Progressive fade** — 6 levels: Full text → Light fade → Half gone → First letters → Ghost → Blackout.
 - **Tap to peek** — tap any faded word to reveal it.
 - **Cover mode** — deliver a beat from memory, then reveal to check.
+- **Self-scoring** — after each beat, rate your recall (Got it / Shaky / Missed). See a session summary and jump into a **review pass** that loops just your weak beats, worst-first. Scores persist locally per script.
 - **Shuffle**, **cue voice** (text-to-speech of the stage direction), and progress tracking.
 - **Deep links** — `?url=<github-link>` opens straight into a script.
+- **Installable PWA** — add it to your phone home screen; the app shell works offline (scripts are still fetched live when you're online).
 - Recent scripts and your position are saved locally. Fully static, no backend.
 
 ## Script format (`.sk`)
