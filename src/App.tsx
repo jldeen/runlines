@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from './state/store';
 import { parseScript, toRaw } from './lib/parse';
-import { getRecents, saveRecent } from './lib/storage';
+import { getRecents, saveRecent, cacheScript, getCachedScript } from './lib/storage';
 import type { Recent } from './types';
 import { Loader } from './components/Loader';
 import { Runner } from './components/Runner';
@@ -26,6 +26,7 @@ export function App() {
       }
       if (srcUrl) {
         saveRecent(deck.title, srcUrl);
+        cacheScript(srcUrl, deck.title, text);
         setRecents(getRecents());
       }
       setError('');
@@ -55,6 +56,14 @@ export function App() {
         start(text, input.trim());
       } catch (err) {
         if (token !== reqRef.current) return;
+        // Offline / fetch failed → fall back to a cached copy if we have one.
+        const cached = getCachedScript(input.trim());
+        if (cached) {
+          if (start(cached.text, input.trim())) {
+            setError('');
+            return;
+          }
+        }
         setError('Could not load: ' + (err instanceof Error ? err.message : String(err)));
       } finally {
         if (token === reqRef.current) setLoading(false);

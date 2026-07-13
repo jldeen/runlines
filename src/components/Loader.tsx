@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Recent } from '../types';
+import { isCached } from '../lib/storage';
 
 interface LoaderProps {
   initialUrl: string;
@@ -77,7 +78,13 @@ export function Loader({ initialUrl, recents, error, loading, onLoadUrl, onPaste
                 <strong>{x.title}</strong>
                 <small>{x.url}</small>
               </div>
-              <span aria-hidden="true">›</span>
+              {isCached(x.url) ? (
+                <span className="offline-tag" title="Saved for offline use">
+                  ✓ offline
+                </span>
+              ) : (
+                <span aria-hidden="true">›</span>
+              )}
             </button>
           ))}
         </div>

@@ -83,6 +83,11 @@ header {
 .iconbtn:active {
   transform: scale(0.96);
 }
+.iconbtn.sel {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.16);
+  color: var(--text);
+}
 
 main {
   flex: 1;
@@ -1043,4 +1048,166 @@ input[type='range'] {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ---------- Practice suite (Round 7) ---------- */
+
+/* Pace timer */
+.pacerow {
+  margin-top: 6px;
+}
+.pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px 3px 4px;
+  font-variant-numeric: tabular-nums;
+}
+.pace-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.pace.onpace .pace-time {
+  color: var(--accent2);
+}
+.pace.good .pace-time {
+  color: var(--accent2);
+}
+.pace.over .pace-time {
+  color: var(--warn);
+}
+.pace-btn {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+}
+.pace-btn:hover {
+  background: var(--panel);
+}
+
+/* Offline tag on recents */
+.offline-tag {
+  flex: none;
+  color: var(--accent2);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(126, 231, 135, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* Voice self-test (in the curtain) */
+.voicecheck {
+  margin-top: 14px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.voice-hint {
+  color: var(--muted) !important;
+  font-size: 13px;
+  margin: 0;
+  max-width: 480px;
+}
+.voice-result {
+  width: 100%;
+  max-width: 480px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.voice-result p {
+  color: var(--text) !important;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.voice-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Drill dialog */
+.drill-stage {
+  margin-top: 12px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 16px;
+}
+.drill-cue {
+  color: var(--warn);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 15px;
+}
+.drill-count {
+  font-size: 46px;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.drill-line {
+  color: #fff;
+  font-size: 20px;
+  line-height: 1.4;
+}
+.drill-done {
+  color: var(--accent2);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* Session history in summary */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.histrow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.histbar {
+  height: 8px;
+  background: var(--panel2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.histbar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.histpct {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
