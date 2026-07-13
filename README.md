@@ -13,11 +13,13 @@ stage cues, tap-to-reveal, and a progressive word-fade slider.
 - **Study modes** — switch each beat between **Lines** (prose), **Bullets** (one point per sentence), and **Cards** (flip notecards: stage cue on the front, line on the back). The fade slider works in every mode; your mode choice is remembered.
 - **Tap to peek** — tap any faded word to reveal it.
 - **Cover mode** — deliver a beat from memory, then reveal to check.
+- **Teleprompter** — a full-screen, large-text scrolling view of the whole script (in **Lines** or **Bullets**), with play/pause auto-scroll, adjustable speed and font size, a horizontal **mirror** toggle for teleprompter glass, and tap-to-pause. Space toggles play; ↑/↓ change speed; Esc closes.
 - **Start over** — jump back to the first beat anytime.
 - **Self-scoring** — after each beat, rate your recall (Got it / Shaky / Missed). See a session summary and jump into a **review pass** that loops just your weak beats, worst-first. Scores persist locally per script.
 - **Shuffle**, **cue voice** (text-to-speech of the stage direction), and progress tracking.
 - **Deep links** — `?url=<github-link>` opens straight into a script.
 - **Installable PWA** — add it to your phone home screen; the app shell works offline (scripts are still fetched live when you're online).
+- **Responsive** — adapts from small phones to tablets and desktops; Prev/Next live in a fixed bottom bar so they never move or get clipped, and wide screens get a two-column practice layout.
 - Recent scripts and your position are saved locally. Fully static, no backend.
 
 ## Script format (`.sk`)
