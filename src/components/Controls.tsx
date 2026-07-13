@@ -19,6 +19,12 @@ interface ControlsProps {
   onTeleprompter: () => void;
   onSummary: () => void;
   onExport: () => void;
+  onHint: () => void;
+  hintLabel: string;
+  hintActive: boolean;
+  onDrill: () => void;
+  onEdit: () => void;
+  edited: boolean;
 }
 
 const MODES: { m: ViewMode; label: string }[] = [
@@ -68,6 +74,14 @@ export function Controls(p: ControlsProps) {
         <button type="button" className="iconbtn" onClick={p.onCover}>
           🙈 Cover
         </button>
+        <button
+          type="button"
+          className={'iconbtn' + (p.hintActive ? ' sel' : '')}
+          onClick={p.onHint}
+          title="Reveal a little more of this beat"
+        >
+          {p.hintLabel}
+        </button>
         <button type="button" className="iconbtn" onClick={p.onRevealAll}>
           👁 Reveal all
         </button>
@@ -82,8 +96,19 @@ export function Controls(p: ControlsProps) {
         <button type="button" className="iconbtn" onClick={p.onSpeak}>
           🔊 Cue voice
         </button>
+        <button type="button" className="iconbtn" onClick={p.onDrill}>
+          🎧 Drill
+        </button>
         <button type="button" className="iconbtn" onClick={p.onTeleprompter}>
           🎬 Teleprompter
+        </button>
+        <button
+          type="button"
+          className={'iconbtn' + (p.edited ? ' sel' : '')}
+          onClick={p.onEdit}
+          title="Edit this beat's line or cue"
+        >
+          {p.edited ? '✏️ Edited' : '✏️ Edit'}
         </button>
         <button type="button" className="iconbtn" onClick={p.onSummary}>
           📊 Summary

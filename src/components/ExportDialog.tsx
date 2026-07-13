@@ -18,6 +18,7 @@ const DEFAULTS: Omit<ExportOpts, 'title'> = {
 
 export function ExportDialog({ open, deck, onClose }: ExportDialogProps) {
   const [opts, setOpts] = useState<ExportOpts>({ ...DEFAULTS, title: deck.title });
+  const [format, setFormat] = useState<'pptx' | 'pdf'>('pptx');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,9 +29,14 @@ export function ExportDialog({ open, deck, onClose }: ExportDialogProps) {
     setBusy(true);
     setError('');
     try {
-      // Load pptxgenjs lazily so it stays out of the main app bundle.
-      const { exportNoteCards } = await import('../lib/pptx');
-      await exportNoteCards(deck.beats, opts);
+      // Load the heavy export libs lazily so they stay out of the main bundle.
+      if (format === 'pdf') {
+        const { exportNoteCardsPdf } = await import('../lib/pdf');
+        await exportNoteCardsPdf(deck.beats, opts);
+      } else {
+        const { exportNoteCards } = await import('../lib/pptx');
+        await exportNoteCards(deck.beats, opts);
+      }
       onClose();
     } catch (e) {
       setError('Export failed: ' + (e instanceof Error ? e.message : String(e)));
@@ -41,10 +47,32 @@ export function ExportDialog({ open, deck, onClose }: ExportDialogProps) {
 
   return (
     <Dialog open={open} onClose={onClose} labelledBy="exportTitle">
-      <h2 id="exportTitle">Export note cards (.pptx)</h2>
+      <h2 id="exportTitle">Export note cards</h2>
       <p className="sub">White text on black — one beat per card, split when it won&apos;t fit.</p>
 
       <div className="field">
+        <label>Format</label>
+        <div className="modebar" role="group" aria-label="File format">
+          <button
+            type="button"
+            className={'modebtn' + (format === 'pptx' ? ' sel' : '')}
+            aria-pressed={format === 'pptx'}
+            onClick={() => setFormat('pptx')}
+          >
+            📊 PowerPoint
+          </button>
+          <button
+            type="button"
+            className={'modebtn' + (format === 'pdf' ? ' sel' : '')}
+            aria-pressed={format === 'pdf'}
+            onClick={() => setFormat('pdf')}
+          >
+            📄 PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
         <label>Content</label>
         <div className="modebar" role="group" aria-label="Card content">
           <button

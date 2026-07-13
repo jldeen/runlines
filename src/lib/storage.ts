@@ -1,4 +1,18 @@
-import type { Deck, Recent, SavedState, ScoreMap, ScoreVal, TpPrefs, ViewMode } from '../types';
+import type {
+  CacheMap,
+  CachedScript,
+  Deck,
+  EditMap,
+  HistoryMap,
+  Recent,
+  RunRecord,
+  SavedState,
+  ScoreMap,
+  ScoreVal,
+  SrsMap,
+  TpPrefs,
+  ViewMode,
+} from '../types';
 
 export const KEYS = {
   recents: 'runlines.recents',
@@ -7,6 +21,10 @@ export const KEYS = {
   view: 'runlines.view',
   tp: 'runlines.tp',
   cue: 'runlines.cue',
+  srs: 'runlines.srs',
+  history: 'runlines.history',
+  edits: 'runlines.edits',
+  cache: 'runlines.cache',
 } as const;
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -119,4 +137,81 @@ export function getCueExpanded(): boolean {
 
 export function saveCueExpanded(v: boolean): void {
   writeJSON(KEYS.cue, v);
+}
+
+/* ---------- Spaced repetition ---------- */
+export function getAllSrs(): SrsMap {
+  const s = readJSON<SrsMap>(KEYS.srs, {});
+  return s && typeof s === 'object' ? s : {};
+}
+
+export function saveAllSrs(s: SrsMap): void {
+  writeJSON(KEYS.srs, s);
+}
+
+export function getDeckSrs(deck: Deck): Record<string, import('../types').SrsCard> {
+  return getAllSrs()[scriptKey(deck)] || {};
+}
+
+/* ---------- Session history ---------- */
+export function getAllHistory(): HistoryMap {
+  const h = readJSON<HistoryMap>(KEYS.history, {});
+  return h && typeof h === 'object' ? h : {};
+}
+
+export function saveAllHistory(h: HistoryMap): void {
+  writeJSON(KEYS.history, h);
+}
+
+export function getDeckHistory(deck: Deck): RunRecord[] {
+  const list = getAllHistory()[scriptKey(deck)];
+  return Array.isArray(list) ? list : [];
+}
+
+export function addHistoryRecord(deck: Deck, rec: RunRecord): RunRecord[] {
+  const all = getAllHistory();
+  const key = scriptKey(deck);
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  list.unshift(rec);
+  all[key] = list.slice(0, 20);
+  saveAllHistory(all);
+  return all[key];
+}
+
+/* ---------- Inline edits ---------- */
+export function getAllEdits(): EditMap {
+  const e = readJSON<EditMap>(KEYS.edits, {});
+  return e && typeof e === 'object' ? e : {};
+}
+
+export function saveAllEdits(e: EditMap): void {
+  writeJSON(KEYS.edits, e);
+}
+
+export function getDeckEdits(deck: Deck): Record<string, import('../types').BeatEdit> {
+  return getAllEdits()[scriptKey(deck)] || {};
+}
+
+/* ---------- Offline script cache ---------- */
+export function getCache(): CacheMap {
+  const c = readJSON<CacheMap>(KEYS.cache, {});
+  return c && typeof c === 'object' ? c : {};
+}
+
+export function cacheScript(url: string, title: string, text: string): void {
+  const all = getCache();
+  all[url] = { url, title, text, at: Date.now() };
+  // Keep only the 12 most-recent cached scripts.
+  const entries = Object.values(all).sort((a, b) => b.at - a.at).slice(0, 12);
+  const trimmed: CacheMap = {};
+  for (const e of entries) trimmed[e.url] = e;
+  writeJSON(KEYS.cache, trimmed);
+}
+
+export function getCachedScript(url: string): CachedScript | null {
+  return getCache()[url] || null;
+}
+
+export function isCached(url: string): boolean {
+  return !!getCache()[url];
 }

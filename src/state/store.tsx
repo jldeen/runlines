@@ -6,17 +6,24 @@ import {
   useReducer,
   type ReactNode,
 } from 'react';
-import type { Deck, ScoreVal, ViewMode } from '../types';
+import type { BeatEdit, Deck, ScoreVal, SrsCard, ViewMode } from '../types';
 import {
+  getAllEdits,
   getAllScores,
+  getAllSrs,
+  getDeckEdits,
   getDeckScores,
+  getDeckSrs,
   getSavedState,
   getSavedView,
+  saveAllEdits,
   saveAllScores,
+  saveAllSrs,
   saveState,
   saveView,
   scriptKey,
 } from '../lib/storage';
+import { applyScore } from '../lib/srs';
 
 export interface RunState {
   deck: Deck | null;
@@ -28,6 +35,9 @@ export interface RunState {
   covered: boolean;
   revealAll: boolean;
   scores: Record<string, ScoreVal>; // for current deck, keyed by original beat idx
+  srs: Record<string, SrsCard>; // spaced-repetition schedule, keyed by original beat idx
+  edits: Record<string, BeatEdit>; // inline overrides, keyed by original beat idx
+  dueMode: boolean; // spaced-repetition "practice due" pass
 }
 
 type Action =
@@ -42,8 +52,10 @@ type Action =
   | { type: 'TOGGLE_SHUFFLE' }
   | { type: 'SET_SCORE'; beatIndex: number; val: ScoreVal | null }
   | { type: 'START_REVIEW'; order: number[] }
+  | { type: 'START_DUE'; order: number[] }
   | { type: 'EXIT_REVIEW'; silent: boolean }
   | { type: 'RESET_SCORES' }
+  | { type: 'EDIT_BEAT'; beatIndex: number; edit: BeatEdit | null }
   | { type: 'JUMP_TO_ORIGINAL'; origIdx: number };
 
 export function activeLen(s: RunState): number {
@@ -64,6 +76,8 @@ function reducer(s: RunState, a: Action): RunState {
     case 'LOAD_DECK': {
       const view = getSavedView();
       const scores = getDeckScores(a.deck);
+      const srs = getDeckSrs(a.deck);
+      const edits = getDeckEdits(a.deck);
       // Restore saved position if it belongs to this exact script.
       const saved = getSavedState();
       const key = scriptKey(a.deck);
@@ -83,6 +97,9 @@ function reducer(s: RunState, a: Action): RunState {
         covered: false,
         revealAll: false,
         scores,
+        srs,
+        edits,
+        dueMode: false,
       };
     }
     case 'RESET':
@@ -117,10 +134,15 @@ function reducer(s: RunState, a: Action): RunState {
     }
     case 'SET_SCORE': {
       const scores = { ...s.scores };
+      const srs = { ...s.srs };
       const k = String(a.beatIndex);
-      if (a.val === null) delete scores[k];
-      else scores[k] = a.val;
-      return { ...s, scores };
+      if (a.val === null) {
+        delete scores[k];
+      } else {
+        scores[k] = a.val;
+        srs[k] = applyScore(s.srs[k], a.val);
+      }
+      return { ...s, scores, srs };
     }
     case 'START_REVIEW':
       return {
@@ -128,16 +150,42 @@ function reducer(s: RunState, a: Action): RunState {
         order: a.order,
         idx: 0,
         reviewMode: true,
+        dueMode: false,
+        covered: false,
+        revealAll: false,
+      };
+    case 'START_DUE':
+      return {
+        ...s,
+        order: a.order,
+        idx: 0,
+        reviewMode: false,
+        dueMode: true,
         covered: false,
         revealAll: false,
       };
     case 'EXIT_REVIEW': {
-      if (!s.reviewMode) return s;
-      if (a.silent) return { ...s, reviewMode: false };
-      return { ...s, reviewMode: false, order: null, idx: 0, covered: false, revealAll: false };
+      if (!s.reviewMode && !s.dueMode) return s;
+      if (a.silent) return { ...s, reviewMode: false, dueMode: false };
+      return {
+        ...s,
+        reviewMode: false,
+        dueMode: false,
+        order: null,
+        idx: 0,
+        covered: false,
+        revealAll: false,
+      };
     }
     case 'RESET_SCORES':
-      return { ...s, scores: {}, reviewMode: false, order: null, idx: 0 };
+      return { ...s, scores: {}, srs: {}, reviewMode: false, dueMode: false, order: null, idx: 0 };
+    case 'EDIT_BEAT': {
+      const edits = { ...s.edits };
+      const k = String(a.beatIndex);
+      if (a.edit === null || (!a.edit.narrative && !a.edit.cue)) delete edits[k];
+      else edits[k] = a.edit;
+      return { ...s, edits };
+    }
     case 'JUMP_TO_ORIGINAL': {
       let idx = a.origIdx;
       if (s.order) {
@@ -161,6 +209,9 @@ const initialState: RunState = {
   covered: false,
   revealAll: false,
   scores: {},
+  srs: {},
+  edits: {},
+  dueMode: false,
 };
 
 interface StoreValue {
@@ -188,6 +239,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     else all[key] = state.scores;
     saveAllScores(all);
   }, [state.deck, state.scores]);
+
+  // Persist spaced-repetition schedule for this deck.
+  useEffect(() => {
+    if (!state.deck) return;
+    const all = getAllSrs();
+    const key = scriptKey(state.deck);
+    if (Object.keys(state.srs).length === 0) delete all[key];
+    else all[key] = state.srs;
+    saveAllSrs(all);
+  }, [state.deck, state.srs]);
+
+  // Persist inline edits for this deck.
+  useEffect(() => {
+    if (!state.deck) return;
+    const all = getAllEdits();
+    const key = scriptKey(state.deck);
+    if (Object.keys(state.edits).length === 0) delete all[key];
+    else all[key] = state.edits;
+    saveAllEdits(all);
+  }, [state.deck, state.edits]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
