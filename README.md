@@ -10,8 +10,10 @@ stage cues, tap-to-reveal, and a progressive word-fade slider.
 - **Load from GitHub** — paste any GitHub file URL to a `.sk` script; it's auto-converted to raw and parsed.
 - **Beats** — each `rows[].narrative` becomes a beat, shown with its stage cue (`demo_actions`) and target `time`.
 - **Progressive fade** — 6 levels: Full text → Light fade → Half gone → First letters → Ghost → Blackout.
+- **Study modes** — switch each beat between **Lines** (prose), **Bullets** (one point per sentence), and **Cards** (flip notecards: stage cue on the front, line on the back). The fade slider works in every mode; your mode choice is remembered.
 - **Tap to peek** — tap any faded word to reveal it.
 - **Cover mode** — deliver a beat from memory, then reveal to check.
+- **Start over** — jump back to the first beat anytime.
 - **Self-scoring** — after each beat, rate your recall (Got it / Shaky / Missed). See a session summary and jump into a **review pass** that loops just your weak beats, worst-first. Scores persist locally per script.
 - **Shuffle**, **cue voice** (text-to-speech of the stage direction), and progress tracking.
 - **Deep links** — `?url=<github-link>` opens straight into a script.

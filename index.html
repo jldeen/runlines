@@ -23,7 +23,7 @@
   html,body{margin:0;height:100%;}
   body{
     background:var(--bg); color:var(--text); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    display:flex;flex-direction:column;min-height:100dvh;
+    display:flex;flex-direction:column;height:100dvh;overflow:hidden;
   }
   header{
     padding:14px 16px calc(14px);
@@ -38,10 +38,10 @@
     border-radius:10px;padding:8px 11px;font-size:13px;cursor:pointer}
   .iconbtn:active{transform:scale(.96)}
 
-  main{flex:1;display:flex;flex-direction:column;width:100%;max-width:720px;margin:0 auto;padding:16px;gap:14px}
+  main{flex:1;display:flex;flex-direction:column;width:100%;max-width:720px;margin:0 auto;padding:16px;gap:14px;min-height:0;overflow:hidden}
 
   /* Loader screen */
-  .loader{display:flex;flex-direction:column;gap:12px}
+  .loader{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow-y:auto}
   .loader p{color:var(--muted);margin:2px 0 0}
   .field{display:flex;flex-direction:column;gap:6px}
   label{font-size:13px;color:var(--muted);font-weight:600}
@@ -67,6 +67,7 @@
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
 
   /* Runner */
+  #runner{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0}
   .meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
   .chip{background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:4px 10px}
   .chip.time{color:var(--accent2);border-color:rgba(126,231,135,.35)}
@@ -74,13 +75,13 @@
   .progressbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .25s}
 
   .cue{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--warn);
-    border-radius:12px;padding:12px 14px}
+    border-radius:12px;padding:12px 14px;flex:0 0 auto;max-height:24vh;overflow:auto}
   .cue h3{margin:0 0 5px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
   .cue p{margin:0;font-size:14px;color:var(--text)}
   .cue .none{color:var(--muted);font-style:italic}
 
   .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
-    padding:18px;min-height:180px;position:relative}
+    padding:18px;flex:1 1 auto;min-height:120px;overflow:auto;position:relative}
   .card .lines{font-size:19px;line-height:1.7;letter-spacing:.1px;white-space:pre-wrap;word-break:break-word}
   .para{margin:0 0 12px}
   .para:last-child{margin-bottom:0}
@@ -96,8 +97,34 @@
   .curtain p{color:var(--muted);margin:0;max-width:340px}
   .curtain .big{font-size:15px;color:var(--text)}
 
-  .controls{display:flex;flex-direction:column;gap:12px;position:sticky;bottom:0;
-    padding:12px 0 calc(10px + var(--safe-b));background:linear-gradient(180deg,transparent,var(--bg) 22%)}
+  /* View-mode segmented control */
+  .modebar{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:4px}
+  .modebtn{flex:1;background:transparent;border:none;color:var(--muted);border-radius:9px;padding:8px 6px;
+    font-size:13px;font-weight:650;cursor:pointer;transition:background .12s,color .12s}
+  .modebtn.sel{background:var(--accent);color:#08111f}
+  .modebtn:active{transform:scale(.97)}
+
+  /* Bullets view */
+  .lines.bullets{font-size:18px}
+  .bulletlist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+  .bulletlist li{position:relative;padding-left:20px;line-height:1.55}
+  .bulletlist li::before{content:'';position:absolute;left:3px;top:.62em;width:7px;height:7px;
+    border-radius:50%;background:var(--accent)}
+
+  /* Cards / notecard view */
+  .flashcard{min-height:100%;cursor:pointer;display:flex;flex-direction:column}
+  .fc-face{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;text-align:center;padding:10px 6px}
+  .fc-back{display:none}
+  .flashcard.flipped .fc-front{display:none}
+  .flashcard.flipped .fc-back{display:flex}
+  .fc-tag{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .fc-cue{font-size:20px;line-height:1.5;margin:0;color:var(--text)}
+  .fc-cue.none{color:var(--muted);font-style:italic}
+  .fc-hint{font-size:12px;color:var(--accent)}
+  .fc-line{font-size:20px;line-height:1.7;text-align:left;white-space:pre-wrap;word-break:break-word}
+
+  .controls{display:flex;flex-direction:column;gap:12px;flex:0 0 auto;
+    padding:4px 0 calc(2px + var(--safe-b))}
   .levelrow{display:flex;align-items:center;gap:12px}
   .levelrow label{white-space:nowrap}
   input[type=range]{flex:1;accent-color:var(--accent)}
@@ -215,6 +242,11 @@
     </div>
 
     <div class="controls">
+      <div class="modebar" id="modeBar">
+        <button class="modebtn sel" data-m="lines" id="modeLines">📄 Lines</button>
+        <button class="modebtn" data-m="bullets" id="modeBullets">• Bullets</button>
+        <button class="modebtn" data-m="cards" id="modeCards">🃏 Cards</button>
+      </div>
       <div class="scorebox" id="scoreBox">
         <h3>How'd I do?</h3>
         <div class="scorebtns">
@@ -232,6 +264,7 @@
         <button class="iconbtn" id="btnCurtain">🙈 Cover</button>
         <button class="iconbtn" id="btnRevealAll">👁 Reveal all</button>
         <button class="iconbtn" id="btnShuffle">🔀 Shuffle</button>
+        <button class="iconbtn" id="btnStartOver">⏮ Start over</button>
         <button class="iconbtn" id="btnSpeak">🔊 Cue voice</button>
         <button class="iconbtn" id="btnSummary">📊 Summary</button>
       </div>
@@ -288,6 +321,8 @@ let idx = 0;
 let level = 0;
 let order = null;  // shuffle/review order (array of original beat indices) or null
 let reviewMode = false;
+let viewMode = 'lines';  // 'lines' | 'bullets' | 'cards'
+const LS_VIEW = 'runlines.view';
 const SCORE_META = {got:'✅ Got it', shaky:'🟡 Shaky', missed:'❌ Missed'};
 
 /* ---------- URL helpers ---------- */
@@ -393,55 +428,112 @@ function seeded(i, seed){
   return x - Math.floor(x);
 }
 
-function renderLines(){
-  const b = DECK.beats[currentBeatIndex()];
-  const cfg = LEVELS[level];
-  const linesEl = $('#lines');
-  linesEl.innerHTML = '';
-  const toks = tokenize(b.narrative);
+function buildWordSpan(t, isMasked, cfg){
+  const span = document.createElement('span');
+  span.className = 'w';
+  span.textContent = t.v;
+  if(isMasked){
+    span.classList.add('masked');
+    if(cfg.firstLetter){
+      const lead = (t.v.match(/^[^A-Za-z0-9]*/)||[''])[0];
+      const core = t.v.slice(lead.length);
+      span.dataset.hint = lead + (core[0]||'') + '·'.repeat(Math.max(0, Math.min(core.length-1, 6)));
+    } else {
+      span.dataset.hint = '···';
+    }
+    span.addEventListener('click', e=>{ e.stopPropagation(); span.classList.toggle('revealed'); });
+  } else if(!/[A-Za-z0-9]/.test(t.v)){
+    span.classList.add('punct');
+  }
+  return span;
+}
 
-  // Which words get masked: mask `frac` of *maskable* words, chosen by seed.
+// Tokenize `text`, mask `frac` of maskable words (deterministic via seed),
+// and append the result into `container`. If makeParas, honor line breaks as <p>.
+function appendMaskedText(container, text, seed, makeParas){
+  const cfg = LEVELS[level];
+  const toks = tokenize(text);
   const wordIdxs = toks.map((t,i)=>t.t==='word'?i:-1).filter(i=>i>=0);
-  const seed = currentBeatIndex();
   const masked = new Set();
   if(cfg.frac > 0){
     wordIdxs.forEach((wi,k)=>{
-      // skip very short pure-punct tokens
-      const raw = toks[wi].v;
-      const hasLetter = /[A-Za-z0-9]/.test(raw);
-      if(!hasLetter) return;
+      if(!/[A-Za-z0-9]/.test(toks[wi].v)) return;
       if(cfg.frac >= 1 || seeded(k, seed) < cfg.frac) masked.add(wi);
     });
   }
-
-  let para = document.createElement('p'); para.className='para';
-  linesEl.appendChild(para);
-
+  let host = container;
+  if(makeParas){ host = document.createElement('p'); host.className='para'; container.appendChild(host); }
   toks.forEach((t,i)=>{
-    if(t.t==='break'){ para = document.createElement('p'); para.className='para'; linesEl.appendChild(para); return; }
-    if(t.t==='space'){ para.appendChild(document.createTextNode(t.v)); return; }
-    const span = document.createElement('span');
-    span.className='w';
-    span.textContent = t.v;
-    if(masked.has(i)){
-      span.classList.add('masked');
-      // hint = first letter (+underscores) or nothing
-      if(cfg.firstLetter){
-        const lead = (t.v.match(/^[^A-Za-z0-9]*/)||[''])[0];
-        const core = t.v.slice(lead.length);
-        const hint = lead + (core[0]||'') + '·'.repeat(Math.max(0, Math.min(core.length-1, 6)));
-        span.dataset.hint = hint;
-      } else {
-        span.dataset.hint = '···';
-      }
-      span.addEventListener('click', ()=>{
-        span.classList.toggle('revealed');
-      });
-    } else if(!/[A-Za-z0-9]/.test(t.v)){
-      span.classList.add('punct');
+    if(t.t==='break'){
+      if(makeParas){ host = document.createElement('p'); host.className='para'; container.appendChild(host); }
+      else host.appendChild(document.createTextNode(' '));
+      return;
     }
-    para.appendChild(span);
+    if(t.t==='space'){ host.appendChild(document.createTextNode(t.v)); return; }
+    host.appendChild(buildWordSpan(t, masked.has(i), cfg));
   });
+}
+
+// Split a beat's narrative into sentence-ish bullets (no lookbehind, iOS-safe).
+function segmentSentences(text){
+  const out = [];
+  text.split(/\n+/).forEach(line=>{
+    line = line.trim();
+    if(!line) return;
+    const re = /[^.!?…]+[.!?…]*(?:\s+|$)/g; let m, any=false;
+    while((m = re.exec(line))){ const s = m[0].trim(); if(s){ out.push(s); any=true; } }
+    if(!any) out.push(line);
+  });
+  return out.length ? out : [text.trim()];
+}
+
+function renderCard(container, b, seed){
+  const flip = document.createElement('div');
+  flip.className = 'flashcard';
+
+  const front = document.createElement('div'); front.className='fc-face fc-front';
+  const ftag = document.createElement('div'); ftag.className='fc-tag'; ftag.textContent='Cue';
+  const cueP = document.createElement('p'); cueP.className='fc-cue' + (b.cue?'':' none');
+  cueP.textContent = b.cue || 'No cue — recall this beat from memory.';
+  const hint = document.createElement('div'); hint.className='fc-hint'; hint.textContent='Tap card to reveal line →';
+  front.append(ftag, cueP, hint);
+
+  const back = document.createElement('div'); back.className='fc-face fc-back';
+  const btag = document.createElement('div'); btag.className='fc-tag'; btag.textContent='Line';
+  const lineWrap = document.createElement('div'); lineWrap.className='fc-line';
+  appendMaskedText(lineWrap, b.narrative, seed, true);
+  const bhint = document.createElement('div'); bhint.className='fc-hint'; bhint.textContent='← Tap to hide';
+  back.append(btag, lineWrap, bhint);
+
+  flip.append(front, back);
+  flip.addEventListener('click', e=>{
+    if(e.target.closest('.w.masked')) return; // let word taps reveal without flipping
+    flip.classList.toggle('flipped');
+  });
+  container.appendChild(flip);
+}
+
+function renderLines(){
+  const b = DECK.beats[currentBeatIndex()];
+  const seed = currentBeatIndex();
+  const linesEl = $('#lines');
+  linesEl.innerHTML = '';
+  linesEl.className = 'lines';
+
+  if(viewMode === 'bullets'){
+    linesEl.classList.add('bullets');
+    const ul = document.createElement('ul'); ul.className='bulletlist';
+    segmentSentences(b.narrative).forEach((seg, si)=>{
+      const li = document.createElement('li');
+      appendMaskedText(li, seg, seed*1000 + si, false);
+      ul.appendChild(li);
+    });
+    linesEl.appendChild(ul);
+  } else if(viewMode === 'cards'){
+    renderCard(linesEl, b, seed);
+  } else {
+    appendMaskedText(linesEl, b.narrative, seed, true);
+  }
 }
 
 function renderCue(){
@@ -487,10 +579,33 @@ function go(delta){
   idx = Math.max(0, Math.min(activeLen()-1, idx+delta));
   setCurtain(false);
   render();
-  $('#card').scrollIntoView({behavior:'smooth', block:'center'});
+  $('#card').scrollTop = 0;
 }
 $('#btnPrev').onclick = ()=>go(-1);
 $('#btnNext').onclick = ()=>go(1);
+
+/* Start over — back to the first beat of the current order */
+$('#btnStartOver').onclick = ()=>{
+  idx = 0;
+  setCurtain(false);
+  render();
+  $('#card').scrollTop = 0;
+};
+
+/* ---------- Study view modes (Lines / Bullets / Cards) ---------- */
+function setViewMode(m){
+  viewMode = m;
+  ['modeLines','modeBullets','modeCards'].forEach(id=>{
+    const el = $('#'+id);
+    el.classList.toggle('sel', el.dataset.m === m);
+  });
+  try{ localStorage.setItem(LS_VIEW, m); }catch(e){}
+  setCurtain(false);
+  if(DECK) render();
+}
+$('#modeLines').onclick   = ()=> setViewMode('lines');
+$('#modeBullets').onclick = ()=> setViewMode('bullets');
+$('#modeCards').onclick   = ()=> setViewMode('cards');
 
 $('#level').addEventListener('input', e=>{ level = +e.target.value; render(); });
 
@@ -630,6 +745,9 @@ function startDeck(deck, srcLabel){
   DECK = deck; idx=0; level=0; order=null; reviewMode=false;
   $('#reviewBanner').classList.add('hide'); closeSummary();
   $('#level').value=0; $('#btnShuffle').textContent='🔀 Shuffle';
+  let savedView = 'lines';
+  try{ savedView = localStorage.getItem(LS_VIEW) || 'lines'; }catch(e){}
+  setViewMode(['lines','bullets','cards'].includes(savedView) ? savedView : 'lines');
   showRunner(); render();
 }
 

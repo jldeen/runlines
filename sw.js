@@ -1,5 +1,5 @@
 /* RunLines service worker — offline app shell, live script fetches. */
-const CACHE = 'runlines-shell-v1';
+const CACHE = 'runlines-shell-v2';
 const SHELL = [
   '/',
   '/index.html',
@@ -38,12 +38,17 @@ self.addEventListener('fetch', event => {
   // These must always hit the network so lines stay live.
   if (url.origin !== self.location.origin) return;
 
-  // Navigation requests: serve cached shell, fall back to network, then index.
+  // Navigation requests: network-first so a fresh deploy is picked up when
+  // online; fall back to the cached shell when offline.
   if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match('/index.html').then(cached =>
-        cached || fetch(req).catch(() => caches.match('/'))
-      )
+      fetch(req)
+        .then(res => {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put('/index.html', copy));
+          return res;
+        })
+        .catch(() => caches.match('/index.html').then(c => c || caches.match('/')))
     );
     return;
   }
