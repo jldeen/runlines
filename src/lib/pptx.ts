@@ -18,26 +18,71 @@ export const EXPORT_DEFAULTS: ExportOpts = {
   title: 'RunLines note cards',
 };
 
-/**
- * Split into the fewest cards needed (ceil(len / max)) but spread items as
- * evenly as possible across them, so we never get an orphan card with a single
- * bullet next to a full one (e.g. 6 items / max 5 => 3 + 3, not 5 + 1).
- */
-function balancedChunk<T>(arr: T[], max: number): T[][] {
-  if (max < 1) max = 1;
-  const len = arr.length;
-  if (len === 0) return [[]];
-  const cards = Math.ceil(len / max);
-  const base = Math.floor(len / cards);
-  let remainder = len % cards;
-  const out: T[][] = [];
-  let i = 0;
-  for (let c = 0; c < cards; c++) {
-    const size = base + (remainder > 0 ? 1 : 0);
-    if (remainder > 0) remainder--;
-    out.push(arr.slice(i, i + size));
-    i += size;
+// Body box geometry (inches) — must match the addText call below.
+const BODY_W = 8.8;
+const BODY_H = 3.95;
+
+/** Estimate how many wrapped lines a bullet takes at a given font size. */
+function estimateLines(text: string, fontSize: number): number {
+  // Average glyph advance ~0.5em; subtract the bullet indent from usable width.
+  const charW = (fontSize * 0.5) / 72;
+  const usableW = BODY_W - 0.3;
+  const charsPerLine = Math.max(8, Math.floor(usableW / charW));
+  const words = text.split(/\s+/).filter(Boolean);
+  let lines = 1;
+  let col = 0;
+  for (const w of words) {
+    const add = (col === 0 ? 0 : 1) + w.length;
+    if (col + add > charsPerLine && col > 0) {
+      lines++;
+      col = w.length;
+    } else {
+      col += add;
+    }
   }
+  return lines;
+}
+
+/**
+ * Group bullets into cards that actually fit: never exceed `maxPerCard`, and
+ * never exceed the vertical line budget for `fontSize`. Cards are balanced by
+ * line count so no card is crammed while another is nearly empty.
+ */
+function packItems(items: string[], maxPerCard: number, fontSize: number): string[][] {
+  if (items.length === 0) return [[]];
+  const lineH = (fontSize * 1.38) / 72; // font size * line-spacing, in inches
+  const maxLines = Math.max(2, Math.floor(BODY_H / lineH));
+  const est = items.map((t) => Math.min(maxLines, estimateLines(t, fontSize)));
+  const total = est.reduce((a, b) => a + b, 0);
+
+  const cardsNeeded = Math.max(
+    Math.ceil(items.length / Math.max(1, maxPerCard)),
+    Math.ceil(total / maxLines),
+    1,
+  );
+  const targetLines = total / cardsNeeded;
+
+  const out: string[][] = [];
+  let cur: string[] = [];
+  let curLines = 0;
+  let cardsLeft = cardsNeeded;
+
+  for (let i = 0; i < items.length; i++) {
+    cur.push(items[i]);
+    curLines += est[i];
+    const itemsLeft = items.length - 1 - i;
+    const atCap = cur.length >= maxPerCard || curLines >= maxLines;
+    const balanced = curLines >= targetLines;
+    // Must leave at least one item for each remaining card.
+    const mustClose = itemsLeft <= cardsLeft - 1;
+    if (cardsLeft > 1 && (atCap || balanced || mustClose)) {
+      out.push(cur);
+      cur = [];
+      curLines = 0;
+      cardsLeft--;
+    }
+  }
+  if (cur.length) out.push(cur);
   return out;
 }
 
@@ -72,11 +117,10 @@ export async function exportNoteCards(beats: Beat[], opts: ExportOpts): Promise<
   // starting at the same Y so cards look consistent regardless of bullet count.
   const CUE_W = 6.7; // cue stays left of the clock zone (slide is 10 wide)
   const BODY_Y = 1.15;
-  const BODY_H = 3.95;
 
   beats.forEach((b, bi) => {
     const items = itemsFor(b, opts.mode);
-    const groups = balancedChunk(items, opts.maxPerCard);
+    const groups = packItems(items, opts.maxPerCard, opts.fontSize);
     groups.forEach((grp, gi) => {
       const slide = pptx.addSlide();
       slide.background = { color: '000000' };
@@ -106,13 +150,14 @@ export async function exportNoteCards(beats: Beat[], opts: ExportOpts): Promise<
       slide.addText(runs, {
         x: 0.6,
         y: BODY_Y,
-        w: 8.8,
+        w: BODY_W,
         h: BODY_H,
         fontSize: opts.fontSize,
         color: 'FFFFFF',
         align: 'left',
         valign: 'top',
         lineSpacingMultiple: 1.15,
+        fit: 'shrink',
       });
 
       const label = groups.length > 1 ? `${bi + 1} · ${gi + 1}/${groups.length}` : `${bi + 1}`;
