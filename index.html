@@ -214,7 +214,9 @@
   .tp .seg button{background:transparent;border:none;color:var(--muted);border-radius:7px;
     padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer}
   .tp .seg button.on{background:var(--accent);color:#08111f}
-  .tp.mirror .seg button.on{background:var(--warn)}
+
+  /* Practice reading region (cue + card) — becomes an internal scroll area on tall viewports */
+  .stage{display:flex;flex-direction:column;gap:14px}
 
   /* ---------- Responsive ---------- */
   /* Roomier reading on tablets/desktops */
@@ -242,25 +244,31 @@
     .footer{display:none}
     body{--navbar-h:64px}
   }
-  /* Wide + tall: two-column reading (cue+card | practice controls) */
+  /* Wide + tall: two-column reading (cue+card | practice controls).
+     Fits the app to the screen so the reading area scrolls internally while the
+     controls and fixed nav bar stay in view — no page scrolling to practice. */
   @media (min-width:960px) and (min-height:640px){
+    body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+    main{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;
+      padding-bottom:calc(var(--navbar-h) + 10px + var(--safe-b))}
     #runner{
+      flex:1;min-height:0;
       display:grid;
       grid-template-columns:1fr minmax(300px,360px);
+      grid-template-rows:auto auto auto 1fr;
       grid-template-areas:
         "banner banner"
         "meta   meta"
         "prog   prog"
-        "cue    controls"
-        "card   controls";
-      align-items:start;column-gap:18px;row-gap:12px;
+        "stage  controls";
+      column-gap:18px;row-gap:12px;
     }
     #reviewBanner{grid-area:banner}
     #runner>.meta{grid-area:meta}
     #runner>.progressbar{grid-area:prog}
-    #cueBox{grid-area:cue}
-    #card{grid-area:card}
-    #runner>.controls{grid-area:controls;position:sticky;top:0}
+    #stage{grid-area:stage;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+    #stage>.cue,#stage>.card{flex:0 0 auto}
+    #runner>.controls{grid-area:controls;align-self:start;position:sticky;top:0}
   }
   /* Pointer devices: subtle hover affordance */
   @media (hover:hover){
@@ -316,6 +324,7 @@
     </div>
     <div class="progressbar"><i id="progFill"></i></div>
 
+    <div class="stage" id="stage">
     <div class="cue" id="cueBox">
       <h3>Stage cue</h3>
       <p id="cueText"></p>
@@ -328,6 +337,7 @@
         <p>Deliver this beat out loud using only the stage cue above, then reveal to check.</p>
         <button class="btn" id="btnReveal" style="max-width:220px">Reveal line</button>
       </div>
+    </div>
     </div>
 
     <div class="controls">
@@ -423,7 +433,10 @@
       <button data-tp="lines" class="on">Lines</button>
       <button data-tp="bullets">Bullets</button>
     </div>
-    <button class="iconbtn" id="tpMirror">🪞 Mirror</button>
+    <div class="seg" id="tpMirrorSeg">
+      <button data-mir="off" class="on">Normal</button>
+      <button data-mir="on">🪞 Mirror</button>
+    </div>
   </div>
 </div>
 <script>
@@ -701,12 +714,13 @@ $('#btnRevealAll').onclick = ()=>{
 
 /* ---------- Navigation ---------- */
 function scrollToTop(){
-  const anchor = $('#runner');
-  if(anchor && typeof anchor.scrollIntoView === 'function'){
-    anchor.scrollIntoView({behavior:'smooth', block:'start'});
-  } else {
-    window.scrollTo({top:0, behavior:'smooth'});
+  const stage = $('#stage');
+  if(stage){
+    if(stage.scrollTo) stage.scrollTo({top:0, behavior:'smooth'});
+    else stage.scrollTop = 0;
   }
+  // Short viewports scroll the page instead of the stage
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 function go(delta){
   idx = Math.max(0, Math.min(activeLen()-1, idx+delta));
@@ -906,6 +920,7 @@ function updateTpUI(){
   $('#tpScroll').style.setProperty('--tp-size', tpSize + 'px');
   $('#teleprompter').classList.toggle('mirror', tpMirror);
   document.querySelectorAll('#tpStyleSeg button').forEach(b=> b.classList.toggle('on', b.dataset.tp === tpStyle));
+  document.querySelectorAll('#tpMirrorSeg button').forEach(b=> b.classList.toggle('on', (b.dataset.mir === 'on') === tpMirror));
 }
 
 function openTeleprompter(){
@@ -935,7 +950,10 @@ $('#tpFaster').onclick = ()=>{ tpSpeed = Math.min(6, +(tpSpeed + 0.2).toFixed(1)
 $('#tpSlower').onclick = ()=>{ tpSpeed = Math.max(0.2, +(tpSpeed - 0.2).toFixed(1)); tpSavePrefs(); updateTpUI(); };
 $('#tpBigger').onclick = ()=>{ tpSize = Math.min(96, tpSize + 4); tpSavePrefs(); updateTpUI(); };
 $('#tpSmaller').onclick = ()=>{ tpSize = Math.max(20, tpSize - 4); tpSavePrefs(); updateTpUI(); };
-$('#tpMirror').onclick = ()=>{ tpMirror = !tpMirror; tpSavePrefs(); updateTpUI(); };
+$('#tpMirrorSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-mir]'); if(!b) return;
+  tpMirror = b.dataset.mir === 'on'; tpSavePrefs(); updateTpUI();
+});
 $('#tpStyleSeg').addEventListener('click', e=>{
   const b = e.target.closest('button[data-tp]'); if(!b) return;
   tpStyle = b.dataset.tp; tpSavePrefs(); tpBuild(); updateTpUI();

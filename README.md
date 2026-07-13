@@ -13,7 +13,7 @@ stage cues, tap-to-reveal, and a progressive word-fade slider.
 - **Study modes** — switch each beat between **Lines** (prose), **Bullets** (one point per sentence), and **Cards** (flip notecards: stage cue on the front, line on the back). The fade slider works in every mode; your mode choice is remembered.
 - **Tap to peek** — tap any faded word to reveal it.
 - **Cover mode** — deliver a beat from memory, then reveal to check.
-- **Teleprompter** — a full-screen, large-text scrolling view of the whole script (in **Lines** or **Bullets**), with play/pause auto-scroll, adjustable speed and font size, a horizontal **mirror** toggle for teleprompter glass, and tap-to-pause. Space toggles play; ↑/↓ change speed; Esc closes.
+- **Teleprompter** — a full-screen, large-text scrolling view of the whole script (in **Lines** or **Bullets**), with play/pause auto-scroll, adjustable speed and font size, a **Normal / Mirror** option (mirror for teleprompter glass), and tap-to-pause. Space toggles play; ↑/↓ change speed; Esc closes.
 - **Start over** — jump back to the first beat anytime.
 - **Self-scoring** — after each beat, rate your recall (Got it / Shaky / Missed). See a session summary and jump into a **review pass** that loops just your weak beats, worst-first. Scores persist locally per script.
 - **Shuffle**, **cue voice** (text-to-speech of the stage direction), and progress tracking.
