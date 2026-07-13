@@ -22,6 +22,10 @@ html,
 body {
   margin: 0;
   height: 100%;
+  max-width: 100%;
+}
+html {
+  overflow-x: hidden;
 }
 body {
   background: var(--bg);
@@ -36,6 +40,7 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  width: 100%;
 }
 
 header {
@@ -95,6 +100,7 @@ main {
   flex-direction: column;
   width: 100%;
   max-width: 720px;
+  min-width: 0;
   margin: 0 auto;
   padding: 16px;
   gap: 14px;
@@ -238,6 +244,7 @@ details summary {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
 }
 .meta {
   display: flex;
@@ -915,6 +922,7 @@ input[type='range'] {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
 }
 
 /* ---------- Responsive ---------- */
@@ -932,6 +940,7 @@ input[type='range'] {
 @media (max-width: 430px) {
   main {
     padding: 12px;
+    padding-bottom: calc(var(--navbar-h) + 16px + var(--safe-b));
   }
   header {
     padding: calc(12px + var(--safe-t)) 14px 12px;
@@ -998,11 +1007,12 @@ input[type='range'] {
     min-height: 0;
     display: grid;
     grid-template-columns: 1fr minmax(300px, 360px);
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     grid-template-areas:
       'banner banner'
       'meta   meta'
       'prog   prog'
+      'pace   pace'
       'stage  controls';
     column-gap: 18px;
     row-gap: 12px;
@@ -1012,6 +1022,9 @@ input[type='range'] {
   }
   main.in-runner #runner > .meta {
     grid-area: meta;
+  }
+  main.in-runner #runner > .meta.pacerow {
+    grid-area: pace;
   }
   main.in-runner #runner > .progressbar {
     grid-area: prog;
