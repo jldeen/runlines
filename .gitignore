@@ -4,5 +4,11 @@ node_modules/
 sample.sk
 .vercel
 
+# Local config and real scripts stay off source control
+.env
+.env.*
+!.env.example
+*.sk
+
 dist/
 *.local

@@ -1,17 +1,31 @@
 import { useState } from 'react';
-import type { Recent } from '../types';
+import type { GitHubAuth, Recent } from '../types';
 import { isCached } from '../lib/storage';
+import { GitHubAccount } from './GitHubAccount';
 
 interface LoaderProps {
   initialUrl: string;
   recents: Recent[];
   error: string;
   loading: boolean;
+  githubAuth: GitHubAuth | null;
+  onGitHubSignedIn: (auth: GitHubAuth) => void;
+  onGitHubSignOut: () => void;
   onLoadUrl: (url: string) => void;
   onPaste: (text: string) => void;
 }
 
-export function Loader({ initialUrl, recents, error, loading, onLoadUrl, onPaste }: LoaderProps) {
+export function Loader({
+  initialUrl,
+  recents,
+  error,
+  loading,
+  githubAuth,
+  onGitHubSignedIn,
+  onGitHubSignOut,
+  onLoadUrl,
+  onPaste,
+}: LoaderProps) {
   const [url, setUrl] = useState(initialUrl);
   const [paste, setPaste] = useState('');
 
@@ -34,7 +48,10 @@ export function Loader({ initialUrl, recents, error, loading, onLoadUrl, onPaste
             if (e.key === 'Enter') onLoadUrl(url);
           }}
         />
-        <div className="hint">Paste a normal GitHub file URL — I convert it to raw automatically.</div>
+        <div className="hint">
+          Paste a normal GitHub file URL — I convert it to raw automatically. Private repos work
+          once you sign in below.
+        </div>
       </div>
       <div className="row2">
         <button type="button" className="btn" disabled={loading} onClick={() => onLoadUrl(url)}>
@@ -46,6 +63,16 @@ export function Loader({ initialUrl, recents, error, loading, onLoadUrl, onPaste
           {error}
         </div>
       ) : null}
+
+      <GitHubAccount
+        auth={githubAuth}
+        onSignedIn={(a) => {
+          onGitHubSignedIn(a);
+          // Retry the link that just failed (e.g. a private deep link opened before sign-in).
+          if (error && url.trim()) onLoadUrl(url);
+        }}
+        onSignOut={onGitHubSignOut}
+      />
 
       <details>
         <summary>Or paste raw JSON / plain text instead</summary>

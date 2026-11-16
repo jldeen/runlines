@@ -72,6 +72,18 @@ export interface CachedScript {
 }
 export type CacheMap = Record<string, CachedScript>;
 
+/* ---------- GitHub sign-in (kept on this device only; never exported) ---------- */
+export interface GitHubAuth {
+  /** 'app' = Sign in with GitHub (GitHub App device flow); 'pat' = pasted token. */
+  kind: 'app' | 'pat';
+  token: string;
+  login: string;
+  /** Epoch ms. Set only for expiring GitHub App tokens. */
+  expiresAt?: number;
+  refreshToken?: string;
+  refreshExpiresAt?: number;
+}
+
 /* ---------- Progress export bundle ---------- */
 export interface ProgressBundle {
   app: 'runlines';

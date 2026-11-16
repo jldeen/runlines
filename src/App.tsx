@@ -1,17 +1,60 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from './state/store';
 import { parseScript, toRaw } from './lib/parse';
-import { getRecents, saveRecent, cacheScript, getCachedScript } from './lib/storage';
-import type { Recent } from './types';
+import {
+  getRecents,
+  saveRecent,
+  cacheScript,
+  getCachedScript,
+  getGitHubAuth,
+  clearGitHubAuth,
+} from './lib/storage';
+import {
+  GitHubError,
+  cleanSourceUrl,
+  fetchScriptText,
+  notFoundHint,
+  parseGitHubUrl,
+  type GitHubLocation,
+} from './lib/github';
+import type { GitHubAuth, Recent } from './types';
 import { Loader } from './components/Loader';
 import { Runner } from './components/Runner';
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+function describeLoadError(err: unknown, loc: GitHubLocation | null): string {
+  if (err instanceof GitHubError) {
+    if (err.status === 404 && loc) {
+      const auth = getGitHubAuth();
+      return auth
+        ? notFoundHint(auth, loc)
+        : 'HTTP 404 — file not found. If it’s in a private repo, sign in to GitHub below first.';
+    }
+    if (err.status === 401) return err.message;
+    return 'Could not load: ' + err.message;
+  }
+  return 'Could not load: ' + (err instanceof Error ? err.message : String(err));
+}
 
 export function App() {
   const { state, dispatch } = useStore();
   const [recents, setRecents] = useState<Recent[]>(() => getRecents());
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initialUrl, setInitialUrl] = useState('');
+  // Read the deep link up front so the Loader's URL field starts with it.
+  const [initialUrl] = useState(() => {
+    const u = new URLSearchParams(location.search).get('url');
+    if (u) return u;
+    return location.hash.startsWith('#url=') ? safeDecode(location.hash.slice(5)) : '';
+  });
+  const [ghAuth, setGhAuth] = useState<GitHubAuth | null>(() => getGitHubAuth());
   const reqRef = useRef(0);
   const inRunner = !!state.deck;
 
@@ -39,33 +82,35 @@ export function App() {
   const loadUrl = useCallback(
     async (input: string) => {
       setError('');
-      const raw = toRaw(input);
+      // Fetch with the link as pasted (a private raw link's ?token= still works),
+      // but save/cache it without the token.
+      const src = cleanSourceUrl(input);
+      const raw = toRaw(input.trim());
       if (!/^https?:\/\//i.test(raw)) {
         setError('That doesn’t look like a URL.');
         return;
       }
+      const loc = parseGitHubUrl(src);
       const token = ++reqRef.current;
       setLoading(true);
       try {
-        const res = await fetch(raw, { cache: 'no-store' });
-        if (!res.ok) {
-          throw new Error('HTTP ' + res.status + (res.status === 404 ? ' — file not found' : ''));
-        }
-        const text = await res.text();
+        const text = await fetchScriptText(raw, loc);
         if (token !== reqRef.current) return; // superseded by a newer load
-        start(text, input.trim());
+        start(text, src);
       } catch (err) {
         if (token !== reqRef.current) return;
         // Offline / fetch failed → fall back to a cached copy if we have one.
-        const cached = getCachedScript(input.trim());
+        const cached = getCachedScript(src);
         if (cached) {
-          if (start(cached.text, input.trim())) {
+          if (start(cached.text, src)) {
             setError('');
             return;
           }
         }
-        setError('Could not load: ' + (err instanceof Error ? err.message : String(err)));
+        setError(describeLoadError(err, loc));
       } finally {
+        // An expired/revoked sign-in clears the saved token; reflect that.
+        setGhAuth(getGitHubAuth());
         if (token === reqRef.current) setLoading(false);
       }
     },
@@ -74,14 +119,7 @@ export function App() {
 
   // Deep link: ?url= or #url=
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const u =
-      params.get('url') ||
-      (location.hash.startsWith('#url=') ? decodeURIComponent(location.hash.slice(5)) : '');
-    if (u) {
-      setInitialUrl(u);
-      loadUrl(u);
-    }
+    if (initialUrl) loadUrl(initialUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -119,6 +157,12 @@ export function App() {
             recents={recents}
             error={error}
             loading={loading}
+            githubAuth={ghAuth}
+            onGitHubSignedIn={setGhAuth}
+            onGitHubSignOut={() => {
+              clearGitHubAuth();
+              setGhAuth(null);
+            }}
             onLoadUrl={loadUrl}
             onPaste={(t) => {
               if (!t.trim()) {
