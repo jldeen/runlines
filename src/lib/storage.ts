@@ -3,6 +3,7 @@ import type {
   CachedScript,
   Deck,
   EditMap,
+  GitHubAuth,
   HistoryMap,
   Recent,
   RunRecord,
@@ -25,6 +26,7 @@ export const KEYS = {
   history: 'runlines.history',
   edits: 'runlines.edits',
   cache: 'runlines.cache',
+  github: 'runlines.github',
 } as const;
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -214,4 +216,31 @@ export function getCachedScript(url: string): CachedScript | null {
 
 export function isCached(url: string): boolean {
   return !!getCache()[url];
+}
+
+/* ---------- GitHub sign-in ---------- */
+export function getGitHubAuth(): GitHubAuth | null {
+  const a = readJSON<Partial<GitHubAuth> | null>(KEYS.github, null);
+  if (
+    a &&
+    (a.kind === 'app' || a.kind === 'pat') &&
+    typeof a.token === 'string' &&
+    a.token &&
+    typeof a.login === 'string'
+  ) {
+    return a as GitHubAuth;
+  }
+  return null;
+}
+
+export function saveGitHubAuth(a: GitHubAuth): void {
+  writeJSON(KEYS.github, a);
+}
+
+export function clearGitHubAuth(): void {
+  try {
+    localStorage.removeItem(KEYS.github);
+  } catch {
+    /* ignore */
+  }
 }

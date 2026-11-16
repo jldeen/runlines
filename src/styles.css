@@ -141,6 +141,7 @@ label {
   accent-color: var(--accent);
 }
 input[type='text'],
+input[type='password'],
 textarea {
   width: 100%;
   background: var(--panel);
@@ -184,6 +185,11 @@ textarea {
   background: var(--panel2);
   color: var(--text);
   border: 1px solid var(--border);
+}
+a.btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
 }
 .row2 {
   display: flex;
@@ -233,10 +239,68 @@ textarea {
   font-size: 12px;
   color: var(--muted);
 }
+.hint a {
+  color: var(--accent);
+}
 details summary {
   cursor: pointer;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* GitHub sign-in */
+.gh-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gh-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 6px 2px 13px;
+  min-width: 0;
+}
+.gh-account span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.gh-account strong {
+  color: var(--text);
+}
+.linkbtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 8px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.device-code {
+  font: 700 32px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 4px;
+  text-align: center;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 4px 0 14px;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.device-status {
+  text-align: center;
+  margin: 10px 0 12px;
 }
 
 /* Runner */
