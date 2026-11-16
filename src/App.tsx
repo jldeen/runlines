@@ -8,6 +8,7 @@ import {
   getCachedScript,
   getGitHubAuth,
   clearGitHubAuth,
+  onGitHubAuthChange,
 } from './lib/storage';
 import {
   GitHubError,
@@ -57,6 +58,9 @@ export function App() {
   const [ghAuth, setGhAuth] = useState<GitHubAuth | null>(() => getGitHubAuth());
   const reqRef = useRef(0);
   const inRunner = !!state.deck;
+
+  // Keep every open tab in step when one signs in, signs out, or refreshes.
+  useEffect(() => onGitHubAuthChange(() => setGhAuth(getGitHubAuth())), []);
 
   const start = useCallback(
     (text: string, srcUrl?: string): boolean => {

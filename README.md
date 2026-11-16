@@ -80,6 +80,7 @@ cp .env.example .env.local   # optional: add your GitHub App client ID
 npm run dev       # dev server on http://localhost:8765
 npm run build     # type-check + production build to dist/
 npm run preview   # serve the production build
+npm test          # unit tests (Vitest)
 ```
 
 ## Deploy
@@ -131,7 +132,13 @@ How your credentials are handled:
   and never included in progress exports.
 - `/api/github/device` forwards the public client ID and the device code or refresh token
   to github.com for sign-in. It holds no secret and stores nothing.
-- Sign-in tokens expire after 8 hours and refresh automatically for up to 6 months.
+- Sign-in tokens expire after 8 hours and refresh automatically for up to 6 months. Open
+  tabs take turns refreshing, so they never spend the same refresh token twice. RunLines
+  only signs you out when GitHub says the sign-in was revoked or ran out; a network or
+  rate-limit hiccup leaves you signed in.
+- Each browser, and the installed Home Screen app, keeps its own sign-in. Safari can delete a
+  site's saved data after 7 days of browsing without visiting it; the Home Screen app keeps
+  it while you use it.
 - **Sign out** removes the token from the device. To revoke it everywhere, go to
   [github.com/settings/apps/authorizations](https://github.com/settings/apps/authorizations)
   (or delete the personal access token).
