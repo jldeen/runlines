@@ -129,22 +129,51 @@ async function errorMessage(res: Response): Promise<string> {
   return `HTTP ${res.status}`;
 }
 
-function signedOutError(): GitHubError {
-  clearGitHubAuth();
-  return new GitHubError(401, 'Your GitHub sign-in expired or was revoked. Sign in again.');
+const SIGNED_OUT_MSG = 'Your GitHub sign-in expired or was revoked. Sign in again.';
+
+/** Forget `auth` (unless another tab already replaced it) and explain why. */
+function signOut(auth: GitHubAuth): GitHubError {
+  clearGitHubAuth(auth.token);
+  return new GitHubError(401, SIGNED_OUT_MSG);
+}
+
+const NEW_TOKEN_MS = 10_000;
+
+/** GitHub can take a moment to accept a token it just minted, so a 401 then isn't a revocation. */
+function justMinted(auth: GitHubAuth): boolean {
+  return !!auth.issuedAt && Date.now() - auth.issuedAt < NEW_TOKEN_MS;
+}
+
+function notReadyError(): GitHubError {
+  return new GitHubError(503, 'GitHub hasn’t accepted your new sign-in yet. Try again in a moment.');
+}
+
+/** After a 401: use a token another tab already rotated in, or refresh once. */
+async function recoverFrom401(used: GitHubAuth): Promise<GitHubAuth> {
+  const current = getGitHubAuth();
+  if (!current) throw new GitHubError(401, SIGNED_OUT_MSG);
+  if (current.token !== used.token) return current;
+  if (justMinted(current)) throw notReadyError();
+  if (current.kind === 'app' && current.refreshToken) return refreshAuth(current);
+  throw signOut(current);
+}
+
+async function authedFetch(url: string, auth: GitHubAuth, accept: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: apiHeaders(auth.token, accept), cache: 'no-store' });
+    if (res.status !== 401 || !justMinted(auth) || attempt >= 2) return res;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
 }
 
 async function apiGet(url: string, accept: string): Promise<Response> {
-  const token = await getAccessToken();
-  if (!token) throw new GitHubError(401, 'Not signed in to GitHub.');
-  let res = await fetch(url, { headers: apiHeaders(token, accept), cache: 'no-store' });
+  const auth = await freshAuth();
+  if (!auth) throw new GitHubError(401, 'Not signed in to GitHub.');
+  let res = await authedFetch(url, auth, accept);
   if (res.status === 401) {
-    const auth = getGitHubAuth();
-    if (auth?.kind === 'app' && auth.refreshToken) {
-      const next = await refreshAuth(auth);
-      res = await fetch(url, { headers: apiHeaders(next.token, accept), cache: 'no-store' });
-    }
-    if (res.status === 401) throw signedOutError();
+    const next = await recoverFrom401(auth);
+    res = await authedFetch(url, next, accept);
+    if (res.status === 401) throw justMinted(next) ? notReadyError() : signOut(next);
   }
   if (!res.ok) throw new GitHubError(res.status, await errorMessage(res));
   return res;
@@ -221,6 +250,7 @@ function tokenFields(d: TokenResponse) {
   const now = Date.now();
   return {
     token: String(d.access_token),
+    issuedAt: now,
     expiresAt: typeof d.expires_in === 'number' ? now + d.expires_in * 1000 : undefined,
     refreshToken: typeof d.refresh_token === 'string' ? d.refresh_token : undefined,
     refreshExpiresAt:
@@ -251,19 +281,40 @@ async function deviceProxy(
 
 let refreshing: Promise<GitHubAuth> | null = null;
 
-/** Single-flight: a refresh token works once, so concurrent callers share one refresh. */
-function refreshAuth(auth: GitHubAuth): Promise<GitHubAuth> {
+/** A refresh token works exactly once, so only one tab may spend it at a time. */
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  return locks ? await locks.request('runlines.github.refresh', fn) : fn();
+}
+
+/** Single-flight in this tab, serialized across tabs. Resolves to the newest saved sign-in. */
+function refreshAuth(stale: GitHubAuth): Promise<GitHubAuth> {
   if (!refreshing) {
-    refreshing = doRefresh(auth).finally(() => {
+    refreshing = withRefreshLock(() => doRefresh(stale)).finally(() => {
       refreshing = null;
     });
   }
   return refreshing;
 }
 
-async function doRefresh(auth: GitHubAuth): Promise<GitHubAuth> {
+/**
+ * GitHub's answers that mean the refresh token is dead for good. A spent (already
+ * rotated) refresh token comes back as `incorrect_client_credentials`.
+ */
+const REFRESH_REVOKED = new Set([
+  'bad_refresh_token',
+  'incorrect_client_credentials',
+  'invalid_grant',
+  'unauthorized_client',
+]);
+
+async function doRefresh(stale: GitHubAuth): Promise<GitHubAuth> {
+  // Re-read inside the lock: another tab may have refreshed or signed out meanwhile.
+  const auth = getGitHubAuth();
+  if (!auth) throw new GitHubError(401, SIGNED_OUT_MSG);
+  if (auth.token !== stale.token) return auth;
   if (!auth.refreshToken || (auth.refreshExpiresAt && Date.now() > auth.refreshExpiresAt)) {
-    throw signedOutError();
+    throw signOut(auth);
   }
   // Network errors propagate untouched so offline loads fall back to the cache.
   const { status, data } = await deviceProxy({
@@ -275,21 +326,34 @@ async function doRefresh(auth: GitHubAuth): Promise<GitHubAuth> {
     saveGitHubAuth(next);
     return next;
   }
-  if (status >= 500) throw new GitHubError(status, 'GitHub sign-in is unavailable right now.');
-  // Another tab may have rotated the refresh token already.
-  const current = getGitHubAuth();
-  if (current && current.token !== auth.token) return current;
-  throw signedOutError();
+  // Only GitHub saying the token is dead signs you out. Anything else (rate limits,
+  // proxy or network trouble) keeps the sign-in so the next try can still refresh.
+  if (status === 200 && typeof data.error === 'string' && REFRESH_REVOKED.has(data.error)) {
+    throw signOut(auth);
+  }
+  const why = typeof data.error === 'string' ? data.error : `HTTP ${status}`;
+  throw new GitHubError(503, `Couldn’t refresh your GitHub sign-in (${why}). Try again in a moment.`);
+}
+
+const REFRESH_EARLY_MS = 5 * 60_000;
+
+/** The saved sign-in, refreshed first if its access token is about to expire. */
+async function freshAuth(): Promise<GitHubAuth | null> {
+  const auth = getGitHubAuth();
+  if (!auth?.expiresAt || Date.now() < auth.expiresAt - REFRESH_EARLY_MS) return auth;
+  try {
+    return await refreshAuth(auth);
+  } catch (e) {
+    // A blip while refreshing early shouldn't fail a load the current token can still do.
+    const signedOut = e instanceof GitHubError && e.status === 401;
+    if (!signedOut && Date.now() < auth.expiresAt) return auth;
+    throw e;
+  }
 }
 
 /** Current access token, refreshed first if it's about to expire. */
 export async function getAccessToken(): Promise<string | null> {
-  const auth = getGitHubAuth();
-  if (!auth) return null;
-  if (auth.expiresAt && Date.now() > auth.expiresAt - 5 * 60_000) {
-    return (await refreshAuth(auth)).token;
-  }
-  return auth.token;
+  return (await freshAuth())?.token ?? null;
 }
 
 async function fetchLogin(token: string): Promise<string> {

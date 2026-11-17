@@ -78,6 +78,8 @@ export interface GitHubAuth {
   kind: 'app' | 'pat';
   token: string;
   login: string;
+  /** Epoch ms when GitHub issued `token` (sign-in or refresh). */
+  issuedAt?: number;
   /** Epoch ms. Set only for expiring GitHub App tokens. */
   expiresAt?: number;
   refreshToken?: string;

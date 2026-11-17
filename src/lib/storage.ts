@@ -237,10 +237,21 @@ export function saveGitHubAuth(a: GitHubAuth): void {
   writeJSON(KEYS.github, a);
 }
 
-export function clearGitHubAuth(): void {
+/** Remove the saved sign-in. With `onlyToken`, only if it's still the saved one (another tab may have replaced it). */
+export function clearGitHubAuth(onlyToken?: string): void {
+  if (onlyToken !== undefined && getGitHubAuth()?.token !== onlyToken) return;
   try {
     localStorage.removeItem(KEYS.github);
   } catch {
     /* ignore */
   }
+}
+
+/** Call `cb` when another tab signs in, signs out, or refreshes the token. */
+export function onGitHubAuthChange(cb: () => void): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || e.key === KEYS.github) cb();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => window.removeEventListener('storage', onStorage);
 }
