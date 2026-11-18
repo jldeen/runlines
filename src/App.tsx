@@ -5,7 +5,6 @@ import {
   getRecents,
   saveRecent,
   cacheScript,
-  getCachedScript,
   getGitHubAuth,
   clearGitHubAuth,
   onGitHubAuthChange,
@@ -13,35 +12,46 @@ import {
 import {
   GitHubError,
   cleanSourceUrl,
-  fetchScriptText,
+  isUnreachable,
+  loadScript,
+  noAccessHint,
   notFoundHint,
   parseGitHubUrl,
   type GitHubLocation,
 } from './lib/github';
+import { sourceFromLocation, withSource } from './lib/deeplink';
 import type { GitHubAuth, Recent } from './types';
 import { Loader } from './components/Loader';
 import { Runner } from './components/Runner';
 
-function safeDecode(s: string): string {
-  try {
-    return decodeURIComponent(s);
-  } catch {
-    return s;
-  }
-}
-
 function describeLoadError(err: unknown, loc: GitHubLocation | null): string {
   if (err instanceof GitHubError) {
+    const auth = getGitHubAuth();
     if (err.status === 404 && loc) {
-      const auth = getGitHubAuth();
       return auth
         ? notFoundHint(auth, loc)
         : 'HTTP 404 — file not found. If it’s in a private repo, sign in to GitHub below first.';
     }
+    if (err.status === 403 && loc && auth && !/rate limit/i.test(err.message)) {
+      return noAccessHint(auth, loc);
+    }
     if (err.status === 401) return err.message;
     return 'Could not load: ' + err.message;
   }
+  if (isUnreachable(err)) {
+    return 'Couldn’t reach the script. Check your connection and try again. (No saved copy of it on this device yet.)';
+  }
   return 'Could not load: ' + (err instanceof Error ? err.message : String(err));
+}
+
+/** Point the address bar at the open script, so a reload re-fetches it. */
+function rememberSource(src: string | null): void {
+  try {
+    const next = withSource(location.href, src);
+    if (next !== location.href) history.replaceState(history.state, '', next);
+  } catch {
+    /* history unavailable — reload just shows the loader */
+  }
 }
 
 export function App() {
@@ -50,11 +60,7 @@ export function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   // Read the deep link up front so the Loader's URL field starts with it.
-  const [initialUrl] = useState(() => {
-    const u = new URLSearchParams(location.search).get('url');
-    if (u) return u;
-    return location.hash.startsWith('#url=') ? safeDecode(location.hash.slice(5)) : '';
-  });
+  const [initialUrl] = useState(() => sourceFromLocation(location));
   const [ghAuth, setGhAuth] = useState<GitHubAuth | null>(() => getGitHubAuth());
   const reqRef = useRef(0);
   const inRunner = !!state.deck;
@@ -63,7 +69,7 @@ export function App() {
   useEffect(() => onGitHubAuthChange(() => setGhAuth(getGitHubAuth())), []);
 
   const start = useCallback(
-    (text: string, srcUrl?: string): boolean => {
+    (text: string, srcUrl?: string, savedCopy?: { at?: number }): boolean => {
       const deck = parseScript(text);
       if (!deck.beats.length) {
         setError(
@@ -73,11 +79,13 @@ export function App() {
       }
       if (srcUrl) {
         saveRecent(deck.title, srcUrl);
-        cacheScript(srcUrl, deck.title, text);
+        // Re-saving a saved copy would stamp it as new.
+        if (!savedCopy) cacheScript(srcUrl, deck.title, text);
         setRecents(getRecents());
       }
+      rememberSource(srcUrl ?? null);
       setError('');
-      dispatch({ type: 'LOAD_DECK', deck });
+      dispatch({ type: 'LOAD_DECK', deck, savedCopy: savedCopy ?? null });
       return true;
     },
     [dispatch],
@@ -98,19 +106,12 @@ export function App() {
       const token = ++reqRef.current;
       setLoading(true);
       try {
-        const text = await fetchScriptText(raw, loc);
+        // Always the live file; the saved copy only when the script can't be reached.
+        const { text, saved } = await loadScript(raw, src, loc);
         if (token !== reqRef.current) return; // superseded by a newer load
-        start(text, src);
+        start(text, src, saved);
       } catch (err) {
         if (token !== reqRef.current) return;
-        // Offline / fetch failed → fall back to a cached copy if we have one.
-        const cached = getCachedScript(src);
-        if (cached) {
-          if (start(cached.text, src)) {
-            setError('');
-            return;
-          }
-        }
         setError(describeLoadError(err, loc));
       } finally {
         // An expired/revoked sign-in clears the saved token; reflect that.
@@ -131,6 +132,7 @@ export function App() {
     reqRef.current++;
     setLoading(false);
     setRecents(getRecents());
+    rememberSource(null);
     dispatch({ type: 'RESET' });
   };
 

@@ -38,10 +38,12 @@ export interface RunState {
   srs: Record<string, SrsCard>; // spaced-repetition schedule, keyed by original beat idx
   edits: Record<string, BeatEdit>; // inline overrides, keyed by original beat idx
   dueMode: boolean; // spaced-repetition "practice due" pass
+  /** Set when the live script couldn't be reached and this is the copy saved on this device. */
+  savedCopy: { at?: number } | null;
 }
 
 type Action =
-  | { type: 'LOAD_DECK'; deck: Deck }
+  | { type: 'LOAD_DECK'; deck: Deck; savedCopy?: { at?: number } | null }
   | { type: 'RESET' }
   | { type: 'GO'; delta: number }
   | { type: 'START_OVER' }
@@ -100,6 +102,7 @@ function reducer(s: RunState, a: Action): RunState {
         srs,
         edits,
         dueMode: false,
+        savedCopy: a.savedCopy ?? null,
       };
     }
     case 'RESET':
@@ -212,6 +215,7 @@ const initialState: RunState = {
   srs: {},
   edits: {},
   dueMode: false,
+  savedCopy: null,
 };
 
 interface StoreValue {

@@ -148,3 +148,84 @@ describe('GitHub sign-in refresh', () => {
     expect(saved()).toMatchObject({ token: 'ghu_old', refreshToken: 'ghr_old' });
   });
 });
+
+describe('loading a script', () => {
+  const SRC = 'https://github.com/octo/scripts/blob/main/demo.sk';
+  const RAW = 'https://raw.githubusercontent.com/octo/scripts/main/demo.sk';
+  const SAVED_AT = Date.UTC(2026, 10, 16, 18, 30);
+
+  function saveCopy() {
+    localStorage.setItem(
+      'runlines.cache',
+      JSON.stringify({ [SRC]: { url: SRC, title: 'Demo', text: 'old copy', at: SAVED_AT } }),
+    );
+  }
+
+  /** Answer the contents API with `api` and the raw URL with `raw` (status or thrown error). */
+  function serve(api: number | Error, raw: number | Error = 404) {
+    const reply = (r: number | Error) => {
+      if (r instanceof Error) throw r;
+      return r === 200 ? new Response('live copy') : json({ message: 'nope' }, r);
+    };
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+      reply(String(url).startsWith('https://api.github.com/') ? api : raw),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  async function load() {
+    const gh = await tab();
+    return gh.loadScript(RAW, SRC, gh.parseGitHubUrl(SRC));
+  }
+
+  it.each([
+    ['signed out, private repo', 404, false],
+    ['signed in, no access', 403, true],
+    ['signed in, wrong link or repo not shared', 404, true],
+    ['sign-in revoked', 401, true],
+  ])('shows the real error instead of the saved copy: %s', async (_, status, signedIn) => {
+    if (signedIn) save({ kind: 'pat', expiresAt: undefined, refreshToken: undefined });
+    saveCopy();
+    serve(status);
+
+    await expect(load()).rejects.toMatchObject({ status });
+  });
+
+  it.each([
+    ['offline', new TypeError('Failed to fetch'), new TypeError('Failed to fetch')],
+    ['GitHub down', 503, 502],
+  ])('uses the saved copy, with its date, only when GitHub is unreachable: %s', async (_, api, raw) => {
+    saveCopy();
+    serve(api, raw);
+
+    await expect(load()).resolves.toEqual({ text: 'old copy', saved: { at: SAVED_AT } });
+  });
+
+  it('fails when offline with no saved copy', async () => {
+    serve(new TypeError('Failed to fetch'), new TypeError('Failed to fetch'));
+
+    await expect(load()).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it('reads the latest commit through the contents API, never from a browser or CDN cache', async () => {
+    saveCopy();
+    const fetchMock = serve(200, 200);
+
+    await expect(load()).resolves.toEqual({ text: 'live copy' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('https://api.github.com/repos/octo/scripts/contents/demo.sk?ref=main');
+    expect(init?.cache).toBe('no-store');
+  });
+
+  it('falls back to the raw link when the anonymous API is rate-limited', async () => {
+    const fetchMock = serve(429, 200);
+
+    await expect(load()).resolves.toEqual({ text: 'live copy' });
+    expect(fetchMock.mock.calls.map(([, init]) => init?.cache)).toEqual([
+      'no-store',
+      'no-store',
+    ]);
+  });
+});

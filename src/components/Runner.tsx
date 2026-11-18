@@ -23,6 +23,19 @@ function applyEdit(beat: Beat, edit: BeatEdit | undefined): Beat {
   };
 }
 
+function savedWhen(at: number | undefined): string {
+  if (!at) return '';
+  return (
+    ' from ' +
+    new Date(at).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  );
+}
+
 export function Runner() {
   const { state, dispatch } = useStore();
   const deck = state.deck!;
@@ -108,21 +121,33 @@ export function Runner() {
   return (
     <>
       <section id="runner">
-        {(state.reviewMode || state.dueMode) && (
-          <div className="banner">
-            <span>
-              <strong>{state.dueMode ? 'Practice due' : 'Review mode'}</strong> ·{' '}
-              <span>
-                {len} beat{len > 1 ? 's' : ''} to work on
-              </span>
-            </span>
-            <button
-              type="button"
-              className="iconbtn"
-              onClick={() => dispatch({ type: 'EXIT_REVIEW', silent: false })}
-            >
-              Exit
-            </button>
+        {(state.savedCopy || state.reviewMode || state.dueMode) && (
+          <div className="banners">
+            {state.savedCopy && (
+              <div className="banner saved-copy" role="status">
+                <span>
+                  <strong>Offline</strong> · Showing your saved copy{savedWhen(state.savedCopy.at)}.
+                  It may be out of date.
+                </span>
+              </div>
+            )}
+            {(state.reviewMode || state.dueMode) && (
+              <div className="banner">
+                <span>
+                  <strong>{state.dueMode ? 'Practice due' : 'Review mode'}</strong> ·{' '}
+                  <span>
+                    {len} beat{len > 1 ? 's' : ''} to work on
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="iconbtn"
+                  onClick={() => dispatch({ type: 'EXIT_REVIEW', silent: false })}
+                >
+                  Exit
+                </button>
+              </div>
+            )}
           </div>
         )}
 
