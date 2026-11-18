@@ -35,8 +35,10 @@ function githubDeviceProxy(clientId: string | undefined): Plugin {
 }
 
 // RunLines — Vite + React + TS.
-// PWA: precache the built app shell; never cache cross-origin script fetches
-// (raw.githubusercontent.com, api.github.com) so lines stay live; network-first navigation.
+// PWA: precache the built app shell for offline use, but never serve it from cache while
+// online: page loads always hit the network so a new deploy takes effect on the next
+// reload, and the precached shell is only the offline fallback. Script fetches
+// (raw.githubusercontent.com, api.github.com) are never cached, so lines stay live.
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
@@ -60,11 +62,20 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
-        // Never cache script content or authenticated GitHub responses — always hit the network.
+        // No cache-first page route: not the default navigation fallback, and the precache
+        // mustn't answer "/" with its copy of index.html either.
+        navigateFallback: null,
+        directoryIndex: null,
         runtimeCaching: [
+          // Page loads: always the network; the precached shell only when offline.
+          {
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' && !url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+            options: { precacheFallback: { fallbackURL: '/index.html' } },
+          },
+          // Never cache script content or authenticated GitHub responses — always hit the network.
           {
             urlPattern: ({ url }) => url.origin === 'https://raw.githubusercontent.com',
             handler: 'NetworkOnly',

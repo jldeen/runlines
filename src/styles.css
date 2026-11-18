@@ -744,6 +744,18 @@ input[type='range'] {
 .banner .iconbtn {
   padding: 6px 10px;
 }
+.banners {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.banner.saved-copy {
+  background: rgba(240, 180, 41, 0.12);
+  border-color: rgba(240, 180, 41, 0.5);
+}
+.banner.saved-copy strong {
+  color: var(--warn);
+}
 
 /* Dialog / overlay */
 .overlay {
@@ -1081,7 +1093,7 @@ input[type='range'] {
     column-gap: 18px;
     row-gap: 12px;
   }
-  main.in-runner #runner > .banner {
+  main.in-runner #runner > .banners {
     grid-area: banner;
   }
   main.in-runner #runner > .meta {

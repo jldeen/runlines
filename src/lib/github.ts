@@ -1,5 +1,5 @@
 import type { GitHubAuth } from '../types';
-import { clearGitHubAuth, getGitHubAuth, saveGitHubAuth } from './storage';
+import { clearGitHubAuth, getCachedScript, getGitHubAuth, saveGitHubAuth } from './storage';
 
 const API = 'https://api.github.com';
 const DEVICE_PROXY = '/api/github/device';
@@ -10,11 +10,18 @@ export const githubSignInEnabled = !!import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 export class GitHubError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** The server itself answered with a 5xx, i.e. it's down right now (not an auth or access problem). */
+  serverDown: boolean;
+  constructor(status: number, message: string, serverDown = false) {
     super(message);
     this.name = 'GitHubError';
     this.status = status;
+    this.serverDown = serverDown;
   }
+}
+
+function httpError(res: Response, message: string): GitHubError {
+  return new GitHubError(res.status, message, res.status >= 500);
 }
 
 /* ---------- URLs ---------- */
@@ -175,12 +182,24 @@ async function apiGet(url: string, accept: string): Promise<Response> {
     res = await authedFetch(url, next, accept);
     if (res.status === 401) throw justMinted(next) ? notReadyError() : signOut(next);
   }
-  if (!res.ok) throw new GitHubError(res.status, await errorMessage(res));
+  if (!res.ok) throw httpError(res, await errorMessage(res));
   return res;
 }
 
-/** Read a file's raw text through the contents API (works for private repos). */
-export async function fetchGitHubFile(loc: GitHubLocation): Promise<string> {
+async function anonymousGet(url: string, accept: string): Promise<Response> {
+  const res = await fetch(url, {
+    headers: { Accept: accept, 'X-GitHub-Api-Version': '2022-11-28' },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw httpError(res, await errorMessage(res));
+  return res;
+}
+
+/**
+ * Read a file's raw text through the contents API: signed in (works for private repos),
+ * or `anonymous` for public ones.
+ */
+export async function fetchGitHubFile(loc: GitHubLocation, anonymous = false): Promise<string> {
   const base = `${API}/repos/${encodeURIComponent(loc.owner)}/${encodeURIComponent(loc.repo)}/contents/`;
   let notFound: GitHubError | null = null;
   for (const c of loc.candidates) {
@@ -189,7 +208,7 @@ export async function fetchGitHubFile(loc: GitHubLocation): Promise<string> {
       c.path.map(encodeURIComponent).join('/') +
       (c.ref ? `?ref=${encodeURIComponent(c.ref)}` : '');
     try {
-      const res = await apiGet(url, 'application/vnd.github.raw+json');
+      const res = await (anonymous ? anonymousGet : apiGet)(url, 'application/vnd.github.raw+json');
       return await res.text();
     } catch (e) {
       if (e instanceof GitHubError && e.status === 404) {
@@ -210,30 +229,76 @@ export function notFoundHint(auth: GitHubAuth, loc: GitHubLocation): string {
     : `Not found, or your token can’t see ${repo}. Check the link, and the token’s repository access.`;
 }
 
+/** Explain a 403 from a signed-in read: the sign-in works but isn't allowed to read that repo. */
+export function noAccessHint(auth: GitHubAuth, loc: GitHubLocation): string {
+  const repo = `${loc.owner}/${loc.repo}`;
+  return auth.kind === 'app'
+    ? `Your GitHub sign-in can’t read ${repo}. Check that the RunLines GitHub App is installed on that repo (github.com/settings/installations).`
+    : `Your token can’t read ${repo}. Check the token’s repository access and its Contents (read) permission.`;
+}
+
 async function fetchPublic(rawUrl: string): Promise<string> {
   const res = await fetch(rawUrl, { cache: 'no-store' });
   if (!res.ok) {
-    throw new GitHubError(res.status, `HTTP ${res.status}${res.status === 404 ? ' — file not found' : ''}`);
+    throw httpError(res, `HTTP ${res.status}${res.status === 404 ? ' — file not found' : ''}`);
   }
   return res.text();
 }
 
 /**
- * Fetch script text. Signed-in GitHub links go through the API (private repos);
- * if that can't see the file, or the sign-in just expired, try the public raw URL
- * before giving up.
+ * Fetch script text. GitHub links go through the contents API, which always returns
+ * the latest commit (raw.githubusercontent.com can serve a copy up to 5 minutes old):
+ * signed in for private repos, anonymously otherwise. If the API can't see the file,
+ * is rate-limited or down, or the sign-in just expired, try the raw URL before giving up.
  */
 export async function fetchScriptText(rawUrl: string, loc: GitHubLocation | null): Promise<string> {
-  if (!loc || !getGitHubAuth()) return fetchPublic(rawUrl);
+  if (!loc) return fetchPublic(rawUrl);
   try {
-    return await fetchGitHubFile(loc);
+    return await fetchGitHubFile(loc, !getGitHubAuth());
   } catch (e) {
-    if (!(e instanceof GitHubError) || ![401, 403, 404].includes(e.status)) throw e;
+    if (!(e instanceof GitHubError) || !([401, 403, 404, 429].includes(e.status) || e.serverDown)) {
+      throw e;
+    }
     try {
       return await fetchPublic(rawUrl);
     } catch {
       throw e;
     }
+  }
+}
+
+/**
+ * True when a load failed because the script couldn't be reached at all (offline,
+ * network error, or the server is down). Sign-in, access, and not-found errors mean
+ * the server answered, so they're never treated as offline.
+ */
+export function isUnreachable(err: unknown): boolean {
+  if (err instanceof GitHubError) return err.serverDown;
+  // fetch() rejects with a TypeError when the request never got an answer.
+  return err instanceof TypeError || (typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+
+export interface LoadedScript {
+  text: string;
+  /** Set only when this is the copy saved on this device, used because the live script was unreachable. */
+  saved?: { at?: number };
+}
+
+/**
+ * Fetch the live script. Falls back to the copy saved on this device only when the
+ * script can't be reached; any other error is thrown so it's never hidden behind an old copy.
+ */
+export async function loadScript(
+  rawUrl: string,
+  srcUrl: string,
+  loc: GitHubLocation | null,
+): Promise<LoadedScript> {
+  try {
+    return { text: await fetchScriptText(rawUrl, loc) };
+  } catch (e) {
+    const cached = isUnreachable(e) ? getCachedScript(srcUrl) : null;
+    if (!cached) throw e;
+    return { text: cached.text, saved: { at: typeof cached.at === 'number' ? cached.at : undefined } };
   }
 }
 
